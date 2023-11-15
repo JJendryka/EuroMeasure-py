@@ -2,6 +2,9 @@
 requires = ["setuptools >= 65", "wheel >= 0.38"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.package-data]
+"euromeasure" = ["py.typed"]
+
 [project]
 name = "euromeasure"
 version = "0.0.0"
