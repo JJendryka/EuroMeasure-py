@@ -52,6 +52,10 @@ class EuroMeasure:
         """Set PID state."""
         self.__execute_command(f"PID:{'ENABLE' if enabled else 'DISABLE'}")
 
+    def set_pid_setpoint(self, value: float) -> None:
+        """Set PID setpoin."""
+        self.__execute_command(f"PID:SET:SETPOINT {value:.6e}")
+
     def set_generator_amplitude(self, channel: int, amplitude: float) -> None:
         """Set Generator amplitude."""
         self.__execute_command(f"GEN:VOLTAGE {channel} {amplitude:.6e}")
