@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools >= 65", "wheel >= 0.38"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "euromeasure"
+version = "0.0.0"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+dependencies = ["pyserial"]
+
+[project.optional-dependencies]
+dev = ["mypy", "ruff", "black"]
+
+[tool.ruff]
+select = ["E", "F", "W", "I", "D", "UP", "N", "B", "A", "C4", "ISC", "ICN", "G", "INP", "PIE", "SIM", "PTH", "RET"]
+line-length = 120
+target-version = "py310"
+exclude = ["build", ".venv"]
+ignore = ["D203", "D213"]
+
+[tool.black]
+line-length = 120
+
+[tool.mypy]
+exclude = ["build", ".venv"]
+ignore_missing_imports = true
+explicit_package_bases = true
+check_untyped_defs = true
+disallow_untyped_defs = true
