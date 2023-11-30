@@ -54,7 +54,7 @@ class EuroMeasure:
 
     def set_pid_setpoint(self, value: float) -> None:
         """Set PID setpoin."""
-        self.__execute_command(f"PID:SET:SETPOINT {value:.6e}")
+        self.__execute_command(f"PID:SETPOINT {value:.6e}")
 
     def set_generator_amplitude(self, channel: int, amplitude: float) -> None:
         """Set Generator amplitude."""
@@ -78,7 +78,7 @@ class EuroMeasure:
 
     def get_source_psu_voltage(self) -> float:
         """Get SourcePSU voltage."""
-        result = self.__execute_command("SOURCE:GET:VOLTAGE")
+        result = self.__execute_command("SOURCE:READ:VOLTAGE")
         try:
             return float(result[0])
         except (ValueError, IndexError) as exception:
@@ -86,7 +86,7 @@ class EuroMeasure:
 
     def get_source_psu_current(self) -> float:
         """Get SourcePSU current."""
-        result = self.__execute_command("SOURCE:GET:CURRENT")
+        result = self.__execute_command("SOURCE:READ:CURRENT")
         try:
             return float(result[0])
         except (ValueError, IndexError) as exception:
@@ -136,6 +136,8 @@ class EuroMeasure:
                     timeout=self.__read_timeout,
                     write_timeout=self.__write_timeout,
                 )
+                time.sleep(0.1)
+                self.port.read(self.port.in_waiting)
                 logger.info("Connected to port: %s", self.__port_name)
                 break
             except serial.SerialException as exception:
@@ -160,6 +162,7 @@ class EuroMeasure:
         for _ in range(self.num_of_receive_retries):
             try:
                 self.__send_command(command)
+                time.sleep(0.01)
                 return self.__read_response()
             except serial.SerialException:
                 continue
@@ -174,6 +177,7 @@ class EuroMeasure:
 
         for _ in range(self.num_of_receive_retries):
             try:
+                self.port.read(self.port.in_waiting)
                 self.port.write((command + "\n").encode())
                 logger.debug("Command sent: %s", command)
                 break
