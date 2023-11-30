@@ -1,12 +1,16 @@
 """Single file library for controlling EuroMeasure system."""
 
+import builtins
 import logging
 import threading
 import time
+from typing import TypeAlias
 
 import serial
 
 logger = logging.getLogger("main")
+
+EMArgument: TypeAlias = int | float
 
 
 class EuroMeasure:
@@ -40,15 +44,15 @@ class EuroMeasure:
 
     def set_pid_p(self, p: float) -> None:
         """Set PID p value."""
-        self.__execute_command(f"PID:SET P {p:.6e}")
+        self.__execute_command("PID:SET P", [p])
 
     def set_pid_i(self, i: float) -> None:
         """Set PID i value."""
-        self.__execute_command(f"PID:SET I {i:.6e}")
+        self.__execute_command("PID:SET I", [i])
 
     def set_pid_d(self, d: float) -> None:
         """Set PID d value."""
-        self.__execute_command(f"PID:SET D {d:.6e}")
+        self.__execute_command("PID:SET D", [d])
 
     def set_pid_state(self, enabled: bool) -> None:
         """Set PID state."""
@@ -56,27 +60,27 @@ class EuroMeasure:
 
     def set_pid_setpoint(self, value: float) -> None:
         """Set PID setpoin."""
-        self.__execute_command(f"PID:SETPOINT {value:.6e}")
+        self.__execute_command("PID:SETPOINT", [value])
 
     def set_generator_amplitude(self, channel: int, amplitude: float) -> None:
         """Set Generator amplitude."""
-        self.__execute_command(f"GEN:VOLTAGE {channel} {amplitude:.6e}")
+        self.__execute_command("GEN:VOLTAGE", [channel, amplitude])
 
     def set_generator_frequency(self, channel: int, frequency: float) -> None:
         """Set Generator frequency."""
-        self.__execute_command(f"GEN:FREQUENCY {channel} {frequency:.6e}")
+        self.__execute_command("GEN:FREQUENCY", [channel, frequency])
 
     def set_hvpsu_voltage(self, channel: int, voltage: float) -> None:
         """Set HVPSU voltage."""
-        self.__execute_command(f"HVPSU:SET {channel} {voltage:.6e}")
+        self.__execute_command("HVPSU:SET", [channel, voltage])
 
     def set_source_psu_voltage(self, voltage: float) -> None:
         """Set SourcePSU voltage."""
-        self.__execute_command(f"SOURCE:SET {voltage:.6e}")
+        self.__execute_command("SOURCE:SET", [voltage])
 
     def set_source_psu_current(self, current: float) -> None:
         """Set SourcePSU current."""
-        self.__execute_command(f"SOURCE:SET:CURRENT {current:.6e}")
+        self.__execute_command("SOURCE:SET:CURRENT", [current])
 
     def get_source_psu_voltage(self) -> float:
         """Get SourcePSU voltage."""
@@ -96,7 +100,7 @@ class EuroMeasure:
 
     def get_voltmeter_voltage(self, channel: int) -> float:
         """Get Voltmeter voltage."""
-        result = self.__execute_command(f"VOLT:MEASURE {channel}")
+        result = self.__execute_command("VOLT:MEASURE", [channel])
         try:
             return float(result[0])
         except (ValueError, IndexError) as exception:
@@ -164,10 +168,23 @@ class EuroMeasure:
         EMConnectionError: if there is any problem with serial communication
     """
 
-    def __execute_command(self, command: str) -> list[str]:
+    def __format_args(self, args: list[EMArgument]) -> str:
+        formatted = ""
+        for arg in args:
+            match (type(arg)):
+                case builtins.int:
+                    formatted += f" {arg}"
+                case builtins.float:
+                    formatted += f" {arg:.6e}"
+
+        return formatted
+
+    def __execute_command(self, command: str, args: list[EMArgument] | None = None) -> list[str]:
         for _ in range(self.num_of_receive_retries):
+            if args is None:
+                args = []
             try:
-                self.__send_command(command)
+                self.__send_command(command + self.__format_args(args))
                 time.sleep(0.01)
                 return self.__read_response()
             except serial.SerialException:
