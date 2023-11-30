@@ -1,6 +1,7 @@
 """Single file library for controlling EuroMeasure system."""
 
 import logging
+import threading
 import time
 
 import serial
@@ -29,6 +30,7 @@ class EuroMeasure:
         self.__read_timeout: float = read_timeout
         self.__write_timeout: float = write_timout
         self.__baudrate: int = baudrate
+        self.__lock: threading.Lock = threading.Lock()
 
         self.connection_retry_delay: float = connection_retry_delay
         self.num_of_connection_retries: int = num_of_connection_retries
@@ -118,28 +120,32 @@ class EuroMeasure:
     def disconnect(self) -> None:
         """Disconnect from the current port."""
         if self.port is not None:
-            self.port.close()
+            with self.__lock:
+                self.port.close()
         self.port = None
         logger.info("Disconnected from port: %s", self.__port_name)
         self.__port_name = None
 
     def __try_connect(self) -> None:
         if self.port is not None:
-            self.port.close()
-            self.port = None
+            with self.__lock:
+                self.port.close()
+                self.port = None
 
         for _ in range(self.num_of_connection_retries):
             try:
-                self.port = serial.Serial(
-                    self.__port_name,
-                    baudrate=self.__baudrate,
-                    timeout=self.__read_timeout,
-                    write_timeout=self.__write_timeout,
-                )
-                time.sleep(0.1)
-                self.port.read(self.port.in_waiting)
-                logger.info("Connected to port: %s", self.__port_name)
-                break
+                with self.__lock:
+                    self.port = serial.Serial(
+                        self.__port_name,
+                        baudrate=self.__baudrate,
+                        timeout=self.__read_timeout,
+                        write_timeout=self.__write_timeout,
+                    )
+                    # Waiting and reading to ignore initial promt
+                    time.sleep(0.1)
+                    self.port.read(self.port.in_waiting)
+                    logger.info("Connected to port: %s", self.__port_name)
+                    break
             except serial.SerialException as exception:
                 logger.error("SerialException while connecting to port: %s", exception.strerror)
             time.sleep(self.connection_retry_delay)
@@ -177,10 +183,12 @@ class EuroMeasure:
 
         for _ in range(self.num_of_receive_retries):
             try:
-                self.port.read(self.port.in_waiting)
-                self.port.write((command + "\n").encode())
-                logger.debug("Command sent: %s", command)
-                break
+                with self.__lock:
+                    # Readt to rgnore everu=ything before command
+                    self.port.read(self.port.in_waiting)
+                    self.port.write((command + "\n").encode())
+                    logger.debug("Command sent: %s", command)
+                    break
             except serial.SerialException as exception:
                 logger.error("Error while trying to send command: %s", exception.strerror)
                 self.__try_connect()
@@ -194,10 +202,11 @@ class EuroMeasure:
         if self.port is None or self.__port_name is None:
             raise EMNotConnectedError
 
-        result_line = self.port.read_until(b"\n").decode()
-        logger.debug("Received result line: %s", result_line.strip())
-        status_line = self.port.read_until(b"\n").decode()
-        logger.debug("Received status line: %s", status_line.strip())
+        with self.__lock:
+            result_line = self.port.read_until(b"\n").decode()
+            logger.debug("Received result line: %s", result_line.strip())
+            status_line = self.port.read_until(b"\n").decode()
+            logger.debug("Received status line: %s", status_line.strip())
 
         if "EM_OK" not in status_line:
             raise EMError(status_line)
