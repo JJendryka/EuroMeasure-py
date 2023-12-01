@@ -10,7 +10,7 @@ import serial
 
 logger = logging.getLogger("main")
 
-EMArgument: TypeAlias = int | float
+EMArgument: TypeAlias = int | float | bool
 
 
 class EuroMeasure:
@@ -84,27 +84,18 @@ class EuroMeasure:
 
     def get_source_psu_voltage(self) -> float:
         """Get SourcePSU voltage."""
-        result = self.__execute_command("SOURCE:READ:VOLTAGE")
-        try:
-            return float(result[0])
-        except (ValueError, IndexError) as exception:
-            raise EMIncorrectResponseError("float", result) from exception
+        (result,) = self.__execute_command("SOURCE:READ:VOLTAGE")
+        return result
 
     def get_source_psu_current(self) -> float:
         """Get SourcePSU current."""
-        result = self.__execute_command("SOURCE:READ:CURRENT")
-        try:
-            return float(result[0])
-        except (ValueError, IndexError) as exception:
-            raise EMIncorrectResponseError("float", result) from exception
+        (result,) = self.__execute_command("SOURCE:READ:CURRENT")
+        return result
 
     def get_voltmeter_voltage(self, channel: int) -> float:
         """Get Voltmeter voltage."""
-        result = self.__execute_command("VOLT:MEASURE", [channel])
-        try:
-            return float(result[0])
-        except (ValueError, IndexError) as exception:
-            raise EMIncorrectResponseError("float", result) from exception
+        (result,) = self.__execute_command("VOLT:MEASURE", [channel])
+        return result
 
     """
     Connect to EuroMeasure system.
@@ -158,6 +149,19 @@ class EuroMeasure:
             self.__port_name = None
             raise EMCannotConnectError
 
+    def __format_args(self, args: list[EMArgument]) -> str:
+        formatted = ""
+        for arg in args:
+            match (type(arg)):
+                case builtins.int:
+                    formatted += f" {arg}"
+                case builtins.float:
+                    formatted += f" {arg:.6e}"
+                case builtins.bool:
+                    formatted += f" {1 if arg else 0}"
+
+        return formatted
+
     """
     Send command to EuroMeasure system and read a response.
 
@@ -168,25 +172,18 @@ class EuroMeasure:
         EMConnectionError: if there is any problem with serial communication
     """
 
-    def __format_args(self, args: list[EMArgument]) -> str:
-        formatted = ""
-        for arg in args:
-            match (type(arg)):
-                case builtins.int:
-                    formatted += f" {arg}"
-                case builtins.float:
-                    formatted += f" {arg:.6e}"
-
-        return formatted
-
-    def __execute_command(self, command: str, args: list[EMArgument] | None = None) -> list[str]:
+    def __execute_command(
+        self, command: str, args: list[EMArgument] | None = None, pattern: list[type] | None = None
+    ) -> list[EMArgument]:
         for _ in range(self.num_of_receive_retries):
             if args is None:
                 args = []
             try:
                 self.__send_command(command + self.__format_args(args))
                 time.sleep(0.01)
-                return self.__read_response()
+                if pattern is not None and pattern:
+                    return self.__read_response(pattern)
+                return []
             except serial.SerialException:
                 continue
         else:
@@ -215,7 +212,7 @@ class EuroMeasure:
 
     """ Read response from EuroMeasure. """
 
-    def __read_response(self) -> list[str]:
+    def __read_response(self, pattern: list[type]) -> list[EMArgument]:
         if self.port is None or self.__port_name is None:
             raise EMNotConnectedError
 
@@ -227,7 +224,21 @@ class EuroMeasure:
 
         if "EM_OK" not in status_line:
             raise EMError(status_line)
-        return result_line.strip().split()
+        return self.__parse_result(result_line, pattern)
+
+    def __parse_result(self, result: str, pattern: list[type]) -> list[EMArgument]:
+        args = result.strip().split()
+        if len(args) != len(pattern):
+            raise EMIncorrectResponseError(pattern, result)
+
+        output: list[EMArgument] = []
+        for arg, kind in zip(args, pattern, strict=True):
+            try:
+                output.append(kind(arg))
+            except ValueError as err:
+                raise EMIncorrectResponseError(pattern, result) from err
+
+        return output
 
 
 class EMConnectionError(Exception):
@@ -278,7 +289,7 @@ class EMError(Exception):
 class EMIncorrectResponseError(Exception):
     """Exception for when response parsing failed."""
 
-    def __init__(self, pattern: str, response: list[str]) -> None:
+    def __init__(self, pattern: list[type], response: str) -> None:
         """Initialize with expected pattern and received response."""
         super().__init__(
             f"Incorrect response from EuroMeasure: response: {response} matching pattern should be: {pattern}"
