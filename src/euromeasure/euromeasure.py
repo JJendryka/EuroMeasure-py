@@ -42,59 +42,64 @@ class EuroMeasure:
         self.receive_retry_delay: float = receive_retry_delay
         self.num_of_receive_retries: int = num_of_receive_retries
 
-    def set_pid_p(self, p: float) -> None:
+    def set_pid_p(self, p: float, address: int | None = None) -> None:
         """Set PID p value."""
-        self.__execute_command("PID:SET P", [p])
+        self.__execute_command("PID", address, "SET P", [p])
 
-    def set_pid_i(self, i: float) -> None:
+    def set_pid_i(self, i: float, address: int | None = None) -> None:
         """Set PID i value."""
-        self.__execute_command("PID:SET I", [i])
+        self.__execute_command("PID", address, "SET I", [i])
 
-    def set_pid_d(self, d: float) -> None:
+    def set_pid_d(self, d: float, address: int | None = None) -> None:
         """Set PID d value."""
-        self.__execute_command("PID:SET D", [d])
+        self.__execute_command("PID", address, "SET D", [d])
 
-    def set_pid_state(self, enabled: bool) -> None:
+    def set_pid_state(self, enabled: bool, address: int | None = None) -> None:
         """Set PID state."""
-        self.__execute_command(f"PID:{'ENABLE' if enabled else 'DISABLE'}")
+        self.__execute_command(f"PID", address, f"{'ENABLE' if enabled else 'DISABLE'}")
 
-    def set_pid_setpoint(self, value: float) -> None:
+    def set_pid_setpoint(self, value: float, address: int | None = None) -> None:
         """Set PID setpoin."""
-        self.__execute_command("PID:SETPOINT", [value])
+        self.__execute_command("PID", address, "SETPOINT", [value])
 
-    def set_generator_amplitude(self, channel: int, amplitude: float) -> None:
+    def set_generator_amplitude(self, channel: int, amplitude: float, address: int | None = None) -> None:
         """Set Generator amplitude."""
-        self.__execute_command("GEN:VOLTAGE", [channel, amplitude])
+        self.__execute_command("GEN", address, "VOLTAGE", [channel, amplitude])
 
-    def set_generator_frequency(self, channel: int, frequency: float) -> None:
+    def set_generator_frequency(self, channel: int, frequency: float, address: int | None = None) -> None:
         """Set Generator frequency."""
-        self.__execute_command("GEN:FREQUENCY", [channel, frequency])
+        self.__execute_command("GEN", address, "FREQUENCY", [channel, frequency])
 
-    def set_hvpsu_voltage(self, channel: int, voltage: float) -> None:
+    def set_hvpsu_voltage(self, channel: int, voltage: float, address: int | None = None) -> None:
         """Set HVPSU voltage."""
-        self.__execute_command("HVPSU:SET", [channel, voltage])
+        self.__execute_command("HVPSU", address, "SET", [channel, voltage])
 
-    def set_source_psu_voltage(self, voltage: float) -> None:
+    def set_source_psu_voltage(self, voltage: float, address: int | None = None) -> None:
         """Set SourcePSU voltage."""
-        self.__execute_command("SOURCE:SET", [voltage])
+        self.__execute_command("SOURCE", address, "SET", [voltage])
 
-    def set_source_psu_current(self, current: float) -> None:
+    def set_source_psu_current(self, current: float, address: int | None = None) -> None:
         """Set SourcePSU current."""
-        self.__execute_command("SOURCE:SET:CURRENT", [current])
+        self.__execute_command("SOURCE", address, "SET:CURRENT", [current])
 
-    def get_source_psu_voltage(self) -> float:
+    def get_source_psu_voltage(self, address: int | None = None) -> float:
         """Get SourcePSU voltage."""
-        (result,) = self.__execute_command("SOURCE:READ:VOLTAGE")
+        (result,) = self.__execute_command("SOURCE", address, "READ:VOLTAGE")
         return result
 
-    def get_source_psu_current(self) -> float:
+    def get_source_psu_current(self, address: int | None = None) -> float:
         """Get SourcePSU current."""
-        (result,) = self.__execute_command("SOURCE:READ:CURRENT")
+        (result,) = self.__execute_command("SOURCE", address, "READ:CURRENT")
         return result
 
-    def get_voltmeter_voltage(self, channel: int) -> float:
+    def get_voltmeter_voltage(self, channel: int, address: int | None = None) -> float:
         """Get Voltmeter voltage."""
-        (result,) = self.__execute_command("VOLT:MEASURE", [channel])
+        (result,) = self.__execute_command(f"VOLT", address, "MEASURE", [channel], [float])
+        return result
+    
+    def get_voltmeter_raw(self, channel: int, address: int | None = None) -> float:
+        """Get Voltmeter voltage."""
+        (result,) = self.__execute_command(f"VOLT", address, "MEASURE_RAW", [channel], [float])
         return result
 
     """
@@ -161,6 +166,12 @@ class EuroMeasure:
                     formatted += f" {1 if arg else 0}"
 
         return formatted
+    
+    def __format_board_name(self, boardtype: str, address: int):
+        if address is not None:
+            return f"{boardtype};{str(address).zfill(2)}:"
+        else:
+            return f"{boardtype}:"
 
     """
     Send command to EuroMeasure system and read a response.
@@ -173,13 +184,13 @@ class EuroMeasure:
     """
 
     def __execute_command(
-        self, command: str, args: list[EMArgument] | None = None, pattern: list[type] | None = None
+        self, boardtype: str, address: int, command: str, args: list[EMArgument] | None = None, pattern: list[type] | None = None
     ) -> list[EMArgument]:
         for _ in range(self.num_of_receive_retries):
             if args is None:
                 args = []
             try:
-                self.__send_command(command + self.__format_args(args))
+                self.__send_command(self.__format_board_name(boardtype, address) + command + self.__format_args(args))
                 time.sleep(0.01)
                 if pattern is not None and pattern:
                     return self.__read_response(pattern)
