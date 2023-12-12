@@ -101,6 +101,10 @@ class EuroMeasure:
         """Get Voltmeter voltage."""
         (result,) = self.__execute_command(f"VOLT", address, "MEASURE_RAW", [channel], [float])
         return result
+    
+    def set_voltmeter_avglen(self, channel: int, avglen: int, address: int | None = None) -> None:
+        """Set HVPSU voltage."""
+        self.__execute_command("VOLT", address, "AVGLEN", [channel, avglen])
 
     """
     Connect to EuroMeasure system.
