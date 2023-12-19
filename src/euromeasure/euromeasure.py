@@ -76,7 +76,7 @@ class EuroMeasure:
 
     def set_hvpsu_raw(self, channel: int, voltage: int, address: int | None = None) -> None:
         """Set HVPSU voltage in raw units."""
-        self.__execute_command("HVPSU", address, "SET_RAW", [channel, voltage])
+        self.__execute_command("HVPSU", address, "SET_RAW", [channel, int(voltage)])
 
     def set_source_psu_voltage(self, voltage: float, address: int | None = None) -> None:
         """Set SourcePSU voltage."""
