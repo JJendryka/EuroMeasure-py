@@ -65,6 +65,10 @@ class EuroMeasure:
     def set_generator_amplitude(self, channel: int, amplitude: float, address: int | None = None) -> None:
         """Set Generator amplitude."""
         self.__execute_command("GEN", address, "VOLTAGE", [int(channel), float(amplitude)])
+    
+    def set_generator_amplitude_raw(self, channel: int, amplitude: float, address: int | None = None) -> None:
+        """Set Generator amplitude."""
+        self.__execute_command("GEN", address, "VOLTAGE_RAW", [int(channel), float(amplitude)])
 
     def set_generator_frequency(self, channel: int, frequency: float, address: int | None = None) -> None:
         """Set Generator frequency."""
